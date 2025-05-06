@@ -1,5 +1,5 @@
 import Book from '../models/Book.js';
-
+import axios from 'axios';
 
 class BookController{
     static async addBook(req, res) {
@@ -69,74 +69,78 @@ class BookController{
         }
     }
 
-    // static async getPopularBooks(req, res){
-    //     try {
-    //         const popularBookIds = await LoanController.aggregateLoanByBorrowCount();
-    //         const bookIds = popularBookIds.map(item => item._id);
-    //         const books = await Book.find({ _id: { $in: bookIds } });
-    //         const bookMap = new Map(books.map(book => [book._id.toString(), book]));
-    //         const popularBooksWithDetails = popularBookIds
-    //             .map(item => {
-    //                 const book = bookMap.get(item._id.toString());
-    //                 if (!book) {
-    //                     console.warn(`Book not found for book_id: ${item._id}`);
-    //                     return null;
-    //                 }
-    //                 return {
-    //                     book_id: item._id,
-    //                     title: book.title,
-    //                     author: book.author,
-    //                     borrow_count: item.borrow_count
-    //                 };
-    //             })
-    //             .filter(book => book !== null);
-    //         res.status(200).json({ message: "Popular books fetched successfully", popularBooks: popularBooksWithDetails });
-    //     } catch (error) {
-    //         console.error(`Error fetching popular books: ${error.message}`);
-    //         res.status(500).json({ message: "Internal server error", error: error.message });
-    //     }
-    // }
-
-    // New method to check book availability
-    static async checkBookAvailability(book_id) {
-        const book = await Book.findById(book_id);
-        if (!book || book.available_copies <= 0) {
-            return { isAvailable: false, book: null };
+    static async getPopularBooks(req, res){
+        try {
+            const popularBooks = await axios.get('http://localhost:3003/api/loans/aggregate/popular-books');
+            if (popularBooks.status !== 200) {
+                return res.status(500).json({ message: "Error fetching popular books" });
+            }
+            const popularBookIds = popularBooks.data.popularBooks;
+            const bookIds = popularBookIds.map(item => item._id);
+            const books = await Book.find({ _id: { $in: bookIds } });
+            const bookMap = new Map(books.map(book => [book._id.toString(), book]));
+            const popularBooksWithDetails = popularBookIds
+                .map(item => {
+                    const book = bookMap.get(item._id.toString());
+                    if (!book) {
+                        console.warn(`Book not found for book_id: ${item._id}`);
+                        return null;
+                    }
+                    return {
+                        book_id: item._id,
+                        title: book.title,
+                        author: book.author,
+                        borrow_count: item.borrow_count
+                    };
+                })
+                .filter(book => book !== null);
+            res.status(200).json({ message: "Popular books fetched successfully", popularBooks: popularBooksWithDetails });
+        } catch (error) {
+            console.error(`Error fetching popular books: ${error.message}`);
+            res.status(500).json({ message: "Internal server error", error: error.message });
         }
-        return { isAvailable: true, book };
     }
 
-    // New method to decrement available copies
-    static async decrementBookCopies(book_id) {
-        const book = await Book.findById(book_id);
+    static async checkBookAvailability(req, res) {
+        const book = await Book.findById(req.params.id);
+        if (!book || book.available_copies <= 0) {
+            res.status(404).json({ message: "Book not available", isAvailable: false });
+        }
+        res.status(200).json({ message: "Book is available", isAvailable: true });
+    }
+
+    static async decrementBookCopies(req, res) {
+        const book = await Book.findById(req.params.id);
         if (!book) {
-            throw new Error("Book not found");
+            return res.status(404).json({ message: "Book not found" });
         }
         if (book.available_copies <= 0) {
-            throw new Error("No available copies");
+            return res.status(400).json({ message: "No available copies to decrement" });
         }
         book.available_copies -= 1;
         await book.save();
-        return book;
+        res.status(200).json({ message: "Book copies decremented successfully"});
     }
 
-    // New method to increment available copies
-    static async incrementBookCopies(book_id) {
-        const book = await Book.findById(book_id);
+
+    static async incrementBookCopies(req, res) {
+        const book = await Book.findById(req.params.id);
         if (!book) {
-            throw new Error("Book not found");
+            return res.status(404).json({ message: "Book not found" });
         }
         book.available_copies += 1;
         await book.save();
-        return book;
+        res.status(200).json({ message: "Book copies incremented successfully"});
     }
 
-    static async getBookCount(){
-        return await Book.countDocuments();
+    static async getBookCount(req, res){
+        const count = await Book.countDocuments();
+        res.status(200).json({ message: "Book count fetched successfully", count });
     }
 
-    static async getAvailableBookCount(){
-        return await Book.countDocuments({ available_copies: { $gt: 0 } });
+    static async getAvailableBookCount(req, res){
+        const count = await Book.countDocuments({ available_copies: { $gt: 0 } });
+        res.status(200).json({ message: "Available book count fetched successfully", count });
     }
 }
 

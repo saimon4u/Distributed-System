@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import axios from 'axios';
 
 class UserController {
     static async createUser(req, res) {
@@ -26,7 +27,11 @@ class UserController {
 
     static async getActiveUsers(req, res){
         try {
-            const activeUserIds = await LoanController.aggregateActiveLoans();
+            const activeLoans = await axios.get('http://backend_loan:3003/api/loans/aggregate/active_loans');
+            if (activeLoans.status !== 200) {
+                return res.status(500).json({ message: "Error fetching active loans" });
+            }
+            const activeUserIds = activeLoans.data.active_loans;
             const userIds = activeUserIds.map(item => item._id);
             const users = await User.find({ _id: { $in: userIds } });
             const userMap = new Map(users.map(user => [user._id.toString(), user]));
@@ -51,8 +56,9 @@ class UserController {
         }
     }
 
-    static async getUserCount(){
-        return await User.countDocuments();
+    static async getUserCount(req, res){
+        const count = await User.countDocuments();
+        res.status(200).json({ message: "User count fetched successfully", count });
     }
 }
 

@@ -1,6 +1,5 @@
 import Loan from '../models/Loan.js';
-import BookController from './bookController.js';
-import UserController from './userController.js';
+import axios from 'axios';
 
 
 
@@ -9,8 +8,11 @@ class LoanController {
         try {
             const { user_id, book_id, due_date } = req.body;
 
-            // Check book availability via BookController
-            const { isAvailable, book } = await BookController.checkBookAvailability(book_id);
+            const bookAvailability = await axios.get('http://localhost:3002/books/available/' + book_id);
+            if (!bookAvailability.status !== 200) {
+                return res.status(500).json({ message: "Error checking book availability" });
+            }
+            const isAvailable = bookAvailability.data.isAvailable;
             if (!isAvailable) {
                 return res.status(400).json({ message: "Book is not available" });
             }
@@ -22,8 +24,7 @@ class LoanController {
                 status: 'ACTIVE'
             });
 
-            // Decrement book copies via BookController
-            await BookController.decrementBookCopies(book_id);
+            await axios.put('http://localhost:3002/api/books/decrement/' + book_id);
             await loan.save();
 
             const loanResponse = {
@@ -49,8 +50,7 @@ class LoanController {
                 return res.status(404).json({ message: "Loan not found or already returned" });
             }
 
-            // Increment book copies via BookController
-            await BookController.incrementBookCopies(loan.book_id);
+            await axios.put('http://localhost:3002/api/books/increment/' + loan.book_id);
 
             loan.return_date = new Date();
             loan.status = 'RETURNED';
@@ -160,7 +160,7 @@ class LoanController {
         }
     }
 
-    static async aggregateActiveLoans(){
+    static async aggregateActiveLoans(req, res){
         const activeLoanUserIds = await Loan.aggregate([
             { $match: { status: 'ACTIVE' } },
             { $group: { _id: '$user_id', books_borrowed: { $sum: 1 } } },
@@ -168,28 +168,40 @@ class LoanController {
             { $limit: 5 }
         ]);
         if (activeLoanUserIds.length === 0) {
-            throw new Error("No active loans found");
+            res.status(404).json({ message: "No active loans found" });
         }
-        return activeLoanUserIds;
+        res.status(200).json({ message: "Active loans aggregated successfully", active_loans: activeLoanUserIds });
     }
 
-    static async aggregateLoanByBorrowCount(){
+    static async aggregateLoanByBorrowCount(req, res){
         const popularBookIds = await Loan.aggregate([
             { $group: { _id: '$book_id', borrow_count: { $sum: 1 } } },
             { $sort: { borrow_count: -1 } },
             { $limit: 5 }
         ]);
         if (popularBookIds.length === 0) {
-            throw new Error("No popular books found");
+            res.status(404).json({ message: "No popular books found" });
         }
-        return popularBookIds;
+        res.status(200).json({ message: "Popular books aggregated successfully", popular_books: popularBookIds });
     }
 
     static async getStatsOverview(req, res) {
         try {
-            const totalBooks = await BookController.getBookCount();
-            const totalUsers = await UserController.getUserCount();
-            const booksAvailable = await BookController.getAvailableBookCount();
+            const bookCount = await axios.get('http://localhost:3002/api/books/count');
+            if (!bookCount.status === 200) {
+                return res.status(500).json({ message: "Error fetching book count" });
+            }
+            const totalBooks = await bookCount.data.count;
+            const userCount = await axios.get('http://localhost:3001/api/users/count');
+            if (!userCount.status === 200) {
+                return res.status(500).json({ message: "Error fetching user count" });
+            }
+            const totalUsers = await userCount.data.count;
+            const availableBookCount = await axios.get('http://localhost:3002/api/books/available/count');
+            if (!availableBookCount.status === 200) {
+                return res.status(500).json({ message: "Error fetching available book count" });
+            }
+            const booksAvailable = await availableBookCount.data.count;
             const booksBorrowed = await Loan.countDocuments({ status: 'ACTIVE' });
             const overdueLoans = await Loan.countDocuments({ status: 'ACTIVE', due_date: { $lt: new Date() } });
     
