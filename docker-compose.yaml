@@ -1,0 +1,44 @@
+services:
+  backend_user:
+    container_name: backend-user
+    build:
+      context: ./userService
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - DATABASE_URI=mongodb://mongodb_user:27017/phase2
+    depends_on:
+      - mongodb_user
+
+  backend_book:
+    container_name: backend-book
+    build:
+      context: ./bookService
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - DATABASE_URI=mongodb://mongodb_book:27017/phase2
+    depends_on:
+      - mongodb_book
+
+  mongodb_user:
+    container_name: mongo-user
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - user-data:/data/db
+  
+  mongodb_book:
+    container_name: mongo-book
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - book-data:/data/db
+
+volumes:
+  user-data:
+  book-data:
