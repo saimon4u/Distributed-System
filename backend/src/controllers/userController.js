@@ -51,6 +51,10 @@ class UserController {
             res.status(500).json({ message: "Internal server error", error: error.message });
         }
     }
+
+    static async getUserCount(){
+        return await User.countDocuments();
+    }
 }
 
 export default UserController;

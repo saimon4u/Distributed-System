@@ -131,6 +131,14 @@ class BookController{
         await book.save();
         return book;
     }
+
+    static async getBookCount(){
+        return await Book.countDocuments();
+    }
+
+    static async getAvailableBookCount(){
+        return await Book.countDocuments({ available_copies: { $gt: 0 } });
+    }
 }
 
 export default BookController;

@@ -1,5 +1,7 @@
+import Book from '../models/Book.js';
 import Loan from '../models/Loan.js';
 import BookController from './bookController.js';
+import UserController from './userController.js';
 
 
 
@@ -182,6 +184,42 @@ class LoanController {
             throw new Error("No popular books found");
         }
         return popularBookIds;
+    }
+
+    static async getStatsOverview(req, res) {
+        try {
+            const totalBooks = await BookController.getBookCount();
+            const totalUsers = await UserController.getUserCount();
+            const booksAvailable = await BookController.getAvailableBookCount();
+            const booksBorrowed = await Loan.countDocuments({ status: 'ACTIVE' });
+            const overdueLoans = await Loan.countDocuments({ status: 'ACTIVE', due_date: { $lt: new Date() } });
+    
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+    
+            const loansToday = await Loan.countDocuments({
+                issue_date: { $gte: today },
+                status: 'ACTIVE'
+            });
+    
+            const returnsToday = await Loan.countDocuments({
+                return_date: { $gte: today }
+            });
+    
+            res.status(200).json({
+                message: "Stats overview fetched successfully",
+                total_books: totalBooks,
+                total_users: totalUsers,
+                books_available: booksAvailable,
+                books_borrowed: booksBorrowed,
+                overdue_loans: overdueLoans,
+                loans_today: loansToday,
+                returns_today: returnsToday
+            });
+        } catch (error) {
+            res.status(500).json({ message: "Internal server error", error: error.message });
+        }
     }
 }
 
