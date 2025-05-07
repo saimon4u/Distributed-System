@@ -28,9 +28,11 @@ class UserController {
     static async getActiveUsers(req, res){
         try {
             const activeLoans = await axios.get('http://backend_loan:3003/api/loans/aggregate/active_loans');
-            if (activeLoans.status !== 200) {
+            if (activeLoans.status !== 200) {   
+                console.log("Hello");
                 return res.status(500).json({ message: "Error fetching active loans" });
             }
+            console.log(activeLoans);
             const activeUserIds = activeLoans.data.active_loans;
             const userIds = activeUserIds.map(item => item._id);
             const users = await User.find({ _id: { $in: userIds } });

@@ -71,7 +71,7 @@ class BookController{
 
     static async getPopularBooks(req, res){
         try {
-            const popularBooks = await axios.get('http://localhost:3003/api/loans/aggregate/popular-books');
+            const popularBooks = await axios.get(`${process.env.LOAN_BACKEND_BASE_URI}/api/loans/aggregate/popular-books`);
             if (popularBooks.status !== 200) {
                 return res.status(500).json({ message: "Error fetching popular books" });
             }
